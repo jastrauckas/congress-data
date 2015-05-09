@@ -9,11 +9,19 @@ import os
 import glob
 import pandas
 import numpy as np
-import pandas as pd
 import pickle
 
+
 '''
-A simple class used to represent the state of a bill or resolution
+Class for pickling data sets 
+'''
+class DataSet:
+    def __init__(self, X, y):
+        self.data = X
+        self.labels = y
+
+'''
+Class used to represent the state of a bill or resolution
 '''
 class Bill:       
     def __init__(self, stat, cat, pctDem, pctRep):
@@ -128,7 +136,11 @@ def loadData(pickleFileName):
     monthCounts = {}
     
     # what information do i need from the bill?
+    procCount = 0
     for path in filepaths:    
+        procCount += 1
+        if procCount % 10000 == 0:
+            print 'Processed ' + str(procCount) + ' bills'
         jfile = open(path, 'r+')            
         json_data = jfile.read().decode("utf-8")
         jdata = json.loads(json_data)
@@ -200,6 +212,7 @@ def loadData(pickleFileName):
         X[thisRow, :] = [csCount, pctDems, pctReps]
         y[thisRow] = label
 
+
     print '================== DATA GATHERING SUMMARY: =================='
     print 'Status counts:'
     print statusCounts
@@ -216,7 +229,8 @@ def loadData(pickleFileName):
     print 'Got ' + str(trainingSampleCount) + ' training samples'
     
     #Create a DataFrame object to make subsetting the data on the class 
-    X = np.array(X)
-    y = np.array(y);
-    df = pd.DataFrame({"passed": y[0:trainingSampleCount,:], "ratio": X[0:trainingSampleCount, :]})
-    pickle.dump(df, pickleFileName)
+    X = np.array(X[1:trainingSampleCount, :])
+    y = np.array(y[1:trainingSampleCount]);
+    dataSet = DataSet(X, y)
+    pickleFile = open(pickleFileName, 'wb')
+    pickle.dump(dataSet, pickleFile)
