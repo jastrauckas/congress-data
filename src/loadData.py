@@ -10,28 +10,24 @@ import glob
 import pandas
 import numpy as np
 import pickle
-
-
-'''
-Class for pickling data sets 
-'''
-class DataSet:
-    def __init__(self, X, y):
-        self.data = X
-        self.labels = y
+import datetime 
 
 '''
 Class used to represent the state of a bill or resolution
 '''
 class Bill:       
-    def __init__(self, stat, cat, pctDem, pctRep):
+    def __init__(self, stat, cat, csCount, pctDem, pctRep, date, congress):
         self.status = stat
         self.category = cat
+        self.cosponsorCount = csCount
         self.pctDemCosponsors = pctDem
         self.pctRepCosponsors = pctRep
+        self.date = date
+        self.congress = congress
     
     def succeeded(self):
         if self.status == 'PASSED:BILL' \
+        or self.status == 'ENACTED:VETO_OVERRIDE' \
         or self.status == 'ENACTED:SIGNED':
             return True 
         else:
@@ -40,6 +36,10 @@ class Bill:
     def failed(self):
         if self.status == 'PROV_KILL:SUSPENSIONFAILED' \
         or self.status == 'PROV_KILL:CLOTUREFAILED' \
+        or self.status == 'PROV_KILL:VETO' \
+        or self.status == 'VETOED:POCKET' \
+        or self.status == 'VETOED:OVERRIDE_FAIL_ORIGINATING:HOUSE' \
+        or self.status == 'VETOED:OVERRIDE_FAIL_ORIGINATING:SENATE' \
         or self.status == 'FAIL:SECOND:SENATE' \
         or self.status == 'FAIL:SECOND:HOUSE' \
         or self.status == 'FAIL:ORIGINATING:HOUSE' \
@@ -111,7 +111,7 @@ def getVoteFilePaths(congressNum):
     return filepaths
     
 def loadData(pickleFileName):
-    numFeats = 3
+    numFeats = 4
     bills = {}
     
     nameToParty = getLegislators()
@@ -119,11 +119,6 @@ def loadData(pickleFileName):
     for congressNum in range(100,113):
         filepaths.extend(getBillFilePaths(congressNum))
         #votepaths = getVoteFilePaths(congressNum)
-    
-    # X contains features, y contains targets
-    numRows = len(filepaths)
-    X = np.zeros((numRows, numFeats), dtype=float)  
-    y = np.zeros((numRows, 1), dtype=int)
     
     # extract features from list of bills
     # we probably only care about bills and joint resolutions
@@ -153,6 +148,7 @@ def loadData(pickleFileName):
         billId = jdata.get('bill_id')
         category = jdata.get('subjects_top_term')
 
+        congress = jdata['congress']
         status = jdata['status']
         if status not in statusCounts:
             statusCounts[status] = 1
@@ -182,36 +178,29 @@ def loadData(pickleFileName):
         '''
         
         date = jdata['introduced_at'] #ie "2013-01-23", 
-        year = date[0:4]
-        month = date[5:7]
+        year = int(date[0:4])
+        month = int(date[5:7])
+        day = int(date[8:10])
+        date = datetime.date(year, month, day)
         dateKey = ''
         if month < 10:
-            dateKey = year + '.0' + month
+            dateKey = str(year) + '.0' + str(month)
         else:
-            dateKey = year + '.' + month
+            dateKey = str(year) + '.' + str(month)
         if dateKey not in monthCounts:
             monthCounts[dateKey] = 1
         else:
             monthCounts[dateKey] +=1
-                         
-        bill = Bill(status, category, pctDems, pctReps)
+        
+        # assign features and labels
+        bill = Bill(status, category, csCount, pctDems, pctReps, date, congress)
+        label = -1 # other
+        if bill.succeeded() == False and bill.failed() == False:
+            continue
         bills[billId] = bill
-        thisRow += 1
         jfile.close()
         
-        # assign features and labels  
-        label = -1 # other
-        if bill.succeeded():
-            label = 1
-        elif bill.failed():
-            label = 0
-        else:
-            continue
-        
         trainingSampleCount += 1
-        X[thisRow, :] = [csCount, pctDems, pctReps]
-        y[thisRow] = label
-
 
     print '================== DATA GATHERING SUMMARY: =================='
     print 'Status counts:'
@@ -229,8 +218,5 @@ def loadData(pickleFileName):
     print 'Got ' + str(trainingSampleCount) + ' training samples'
     
     #Create a DataFrame object to make subsetting the data on the class 
-    X = np.array(X[1:trainingSampleCount, :])
-    y = np.array(y[1:trainingSampleCount]);
-    dataSet = DataSet(X, y)
     pickleFile = open(pickleFileName, 'wb')
-    pickle.dump(dataSet, pickleFile)
+    pickle.dump(bills, pickleFile)
