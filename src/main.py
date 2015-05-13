@@ -14,7 +14,7 @@ from sklearn import cross_validation, tree, svm, lda
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 
-REBUILD_DATA = False
+REBUILD_DATA = True
 
 def getClassifier():
     clf = tree.DecisionTreeClassifier()
@@ -115,14 +115,26 @@ def getCategoryMap(bills):
     return catMap
     
 def getFeatures(bills):
-    numFeats = 4
+    numFeats = 5
     numRows = len(bills)
     catMap = getCategoryMap(bills)
+    congressMap = ld.getPartiesByCongress()
     X = np.zeros((numRows, numFeats), dtype=float)  
     y = np.zeros((numRows, 1), dtype=int)
     z = np.zeros((numRows, 1), dtype=int)
     thisRow = 0
     for bill in bills.values():
+        congressNum = int(bill.congress)
+        congressData = congressMap[congressNum]
+        hPctDem = congressData.housePctDem
+        hPctRep = congressData.housePctRep
+        sPctDem = congressData.senatePctDem
+        sPctRep = congressData.senatePctRep
+        partyControl = 0
+        if (hPctDem > hPctRep and sPctDem > sPctRep):
+            partyControl = 1
+        elif (hPctDem < hPctRep and sPctDem < sPctRep):
+            partyControl = -1
         # assign features and labels  
         label = -1 # other
         if bill.succeeded():
@@ -134,7 +146,7 @@ def getFeatures(bills):
         catNum = catMap[bill.category]
 
         # once you add in a categorical feature, definitely want classifier without distance metric
-        X[thisRow, :] = [bill.cosponsorCount, bill.pctDemCosponsors, bill.pctRepCosponsors, catNum]
+        X[thisRow, :] = [bill.cosponsorCount, bill.pctDemCosponsors, bill.pctRepCosponsors, catNum, partyControl]
         y[thisRow] = label
         z[thisRow] = int(bill.congress)
         thisRow += 1

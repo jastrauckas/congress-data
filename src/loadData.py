@@ -47,6 +47,14 @@ class Bill:
             return True 
         else:
             return False   
+ 
+class Congress:
+    def __init__(self, num, housePctDem, housePctRep, senatePctDem, senatePctRep):
+        self.number = num
+        self.housePctDem = housePctDem
+        self.housePctRep = housePctRep
+        self.senatePctDem = senatePctDem
+        self.senatePctRep = senatePctRep
         
 
 class Vote:
@@ -109,6 +117,26 @@ def getVoteFilePaths(congressNum):
                     path = os.path.join(dirname, f)
                     filepaths.append(path)
     return filepaths
+    
+def getPartiesByCongress():
+    d = {}
+    filename = '../partyControl.csv'
+    df = pandas.read_csv(filename)    
+    congressNums = list(df['Congress'])
+    senateDemNums = list(df['Senate Dems'])
+    houseDemNums = list(df['House Dems'])
+    senateRepNums = list(df['Senate Reps'])
+    houseRepNums = list(df['House Reps'])
+    for i in range(len(congressNums)):
+        num = congressNums[i]
+        hPctDem = float(houseDemNums[i]) / 435
+        hPctRep = float(houseRepNums[i]) / 435
+        sPctDem = float(senateDemNums[i]) / 100
+        sPctRep = float(senateRepNums[i]) / 100
+        congress = Congress(num, hPctDem, hPctRep, sPctDem, sPctRep)
+        d[num] = congress
+    return d
+        
     
 def loadData(pickleFileName):
     numFeats = 4
