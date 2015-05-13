@@ -14,7 +14,7 @@ from sklearn import cross_validation, tree, svm, lda
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 
-REBUILD_DATA = False
+REBUILD_DATA = True
 
 def getClassifier():
     clf = tree.DecisionTreeClassifier()
@@ -49,7 +49,7 @@ def trainAndTest(X,y,z):
     testRows = 0 
     trainRows = 0
     for i in range(totalRows):
-        congressNum = z[i]
+        congressNum = int(z[i])
         if congressNum < 112:
             Xtrain[trainRows, :] = X[i,:]
             ytrain.append(y[i])
@@ -115,7 +115,7 @@ def getCategoryMap(bills):
     return catMap
     
 def getFeatures(bills):
-    numFeats = 6
+    numFeats = 7
     numRows = len(bills)
     catMap = getCategoryMap(bills)
     congressMap = ld.getPartiesByCongress()
@@ -131,7 +131,6 @@ def getFeatures(bills):
         sPctDem = congressData.senatePctDem
         sPctRep = congressData.senatePctRep
         presParty = congressData.presParty
-        print 'president party: ' + str(presParty)
         partyControl = 0
         if (hPctDem > hPctRep and sPctDem > sPctRep):
             partyControl = 1
@@ -148,7 +147,7 @@ def getFeatures(bills):
         catNum = catMap[bill.category]
 
         # once you add in a categorical feature, definitely want classifier without distance metric
-        X[thisRow, :] = [bill.cosponsorCount, bill.pctDemCosponsors, bill.pctRepCosponsors, catNum, partyControl, presParty]
+        X[thisRow, :] = [bill.sponsorParty, bill.cosponsorCount, bill.pctDemCosponsors, bill.pctRepCosponsors, catNum, partyControl, presParty]
         y[thisRow] = label
         z[thisRow] = int(bill.congress)
         thisRow += 1
@@ -175,7 +174,7 @@ def main():
     crossValidate(X,y)
     
     # look at feature distributions
-    labels = ['Number of cosponsors', '% Democratic Cosponsors', '% Republican Cosponsors', 'Numerical Category', 'Party Control', 'President Party']
+    labels = ['Sponsor party', 'Number of cosponsors', '% Democratic Cosponsors', '% Republican Cosponsors', 'Numerical Category', 'Party Control', 'President Party']
     getFeatureDistributions(X, labels)
     
     # train, leaving out most recent congress (113), and get confusion matrix

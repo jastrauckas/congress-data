@@ -16,9 +16,10 @@ import datetime
 Class used to represent the state of a bill or resolution
 '''
 class Bill:       
-    def __init__(self, stat, cat, csCount, pctDem, pctRep, date, congress):
+    def __init__(self, stat, cat, sponsorParty, csCount, pctDem, pctRep, date, congress):
         self.status = stat
         self.category = cat
+        self.sponsorParty = sponsorParty
         self.cosponsorCount = csCount
         self.pctDemCosponsors = pctDem
         self.pctRepCosponsors = pctRep
@@ -68,20 +69,28 @@ Returns a dict of congresspeoples' names -> parties
 def getLegislators():
     # build local database of congresspeople
     # TODO: make sure there are not duplicates
-    nameToParty = {}  
+    nameToParty = {}
+    tidToParty = {}
     prefix = '../legislators/'
     dataDirs = os.path.join(prefix, '*')
-    filepaths = list(set(glob.glob(dataDirs)))    
+    filepaths = list(set(glob.glob(dataDirs))) 
     for f in filepaths:   
         df = pandas.read_csv(f)
         lastNames = list(df['last_name'])
         firstNames = list(df['first_name'])
+        tids = list(df['thomas_id'])
         parties = list(df['party'])
         for i in range(len(lastNames)):
             fullName = lastNames[i] + ', ' + firstNames[i]
-            party = parties[i]
-            nameToParty[fullName] = party;   
-    return nameToParty
+            try:
+                thomasId = int(tids[i])
+                party = parties[i]
+                nameToParty[fullName] = party;   
+                if thomasId > 0:
+                    tidToParty[thomasId] = party
+            except ValueError:
+                continue    
+    return (nameToParty, tidToParty)
     
 '''
 Returns a list of all the paths to files containing bill json data
@@ -136,19 +145,26 @@ def getPartiesByCongress():
         sPctDem = float(senateDemNums[i]) / 100
         sPctRep = float(senateRepNums[i]) / 100
         presPartyCode = presParties[i]
-        presParty = 0
+        presParty = -1
         if (presPartyCode == 'D'):
             presParty = 1
         congress = Congress(num, hPctDem, hPctRep, sPctDem, sPctRep, presParty)
         d[num] = congress
     return d
         
+def getPartyCode(party):
+    sponsorParty = 0
+    if party == 'Democrat':
+        sponsorParty = 1
+    elif party == 'Republican':
+        sponsorParty = -1    
+    return sponsorParty
     
 def loadData(pickleFileName):
     numFeats = 4
     bills = {}
     
-    nameToParty = getLegislators()
+    (nameToParty, tidToParty) = getLegislators()
     filepaths = []
     for congressNum in range(100,113):
         filepaths.extend(getBillFilePaths(congressNum))
@@ -176,7 +192,16 @@ def loadData(pickleFileName):
 
         # FEATURES
         #summary = jdata['summary']['text']
+        sponsorName = ''
+        sponsorTid = 0
         cosponsors = []
+        if 'sponsor' in jdata:
+            #print jdata.get('sponsor')
+            sponsor = jdata.get('sponsor')
+            if sponsor and 'name' in sponsor:
+                sponsorName = sponsor.get('name')
+            if sponsor and 'thomas_id' in sponsor:
+                sponsorTid = int(sponsor.get('thomas_id'))
         if 'cosponsors' in jdata:
             cosponsors = jdata.get('cosponsors')
         billId = jdata.get('bill_id')
@@ -193,10 +218,23 @@ def loadData(pickleFileName):
         csInds = 0
         pctDems = 0
         pctReps = 0
-        
+        sponsorParty = 0
+        if sponsorName != '':
+            if sponsorName in nameToParty:
+                party = nameToParty[sponsorName]
+                sponsorParty = getPartyCode(party)
+            elif sponsorTid in tidToParty:
+                party = tidToParty[sponsorTid]
+                sponsorParty = getPartyCode(party)
         for cs in cosponsors:
             name = cs['name']
-            if name not in nameToParty:
+            tid = cs['thomas_id']
+            party = ''
+            if name in nameToParty:
+                party = nameToParty[name]
+            if tid in tidToParty:
+                party = tidToParty[tid]  
+            if party == '':
                 continue
             csCount += 1
             party = nameToParty[name]
@@ -227,7 +265,7 @@ def loadData(pickleFileName):
             monthCounts[dateKey] +=1
         
         # assign features and labels
-        bill = Bill(status, category, csCount, pctDems, pctReps, date, congress)
+        bill = Bill(status, category, sponsorParty, csCount, pctDems, pctReps, date, congress)
         label = -1 # other
         if bill.succeeded() == False and bill.failed() == False:
             continue
