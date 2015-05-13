@@ -14,7 +14,7 @@ from sklearn import cross_validation, tree, svm, lda
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 
-REBUILD_DATA = True
+REBUILD_DATA = False
 
 def getClassifier():
     clf = tree.DecisionTreeClassifier()
@@ -115,7 +115,7 @@ def getCategoryMap(bills):
     return catMap
     
 def getFeatures(bills):
-    numFeats = 5
+    numFeats = 6
     numRows = len(bills)
     catMap = getCategoryMap(bills)
     congressMap = ld.getPartiesByCongress()
@@ -130,6 +130,8 @@ def getFeatures(bills):
         hPctRep = congressData.housePctRep
         sPctDem = congressData.senatePctDem
         sPctRep = congressData.senatePctRep
+        presParty = congressData.presParty
+        print 'president party: ' + str(presParty)
         partyControl = 0
         if (hPctDem > hPctRep and sPctDem > sPctRep):
             partyControl = 1
@@ -146,7 +148,7 @@ def getFeatures(bills):
         catNum = catMap[bill.category]
 
         # once you add in a categorical feature, definitely want classifier without distance metric
-        X[thisRow, :] = [bill.cosponsorCount, bill.pctDemCosponsors, bill.pctRepCosponsors, catNum, partyControl]
+        X[thisRow, :] = [bill.cosponsorCount, bill.pctDemCosponsors, bill.pctRepCosponsors, catNum, partyControl, presParty]
         y[thisRow] = label
         z[thisRow] = int(bill.congress)
         thisRow += 1
@@ -173,7 +175,7 @@ def main():
     crossValidate(X,y)
     
     # look at feature distributions
-    labels = ['Number of cosponsors', '% Democratic Cosponsors', '% Republican Cosponsors', 'Numerical Category']
+    labels = ['Number of cosponsors', '% Democratic Cosponsors', '% Republican Cosponsors', 'Numerical Category', 'Party Control', 'President Party']
     getFeatureDistributions(X, labels)
     
     # train, leaving out most recent congress (113), and get confusion matrix

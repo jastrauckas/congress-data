@@ -49,12 +49,13 @@ class Bill:
             return False   
  
 class Congress:
-    def __init__(self, num, housePctDem, housePctRep, senatePctDem, senatePctRep):
+    def __init__(self, num, housePctDem, housePctRep, senatePctDem, senatePctRep, presParty):
         self.number = num
         self.housePctDem = housePctDem
         self.housePctRep = housePctRep
         self.senatePctDem = senatePctDem
         self.senatePctRep = senatePctRep
+        self.presParty = presParty
         
 
 class Vote:
@@ -127,13 +128,18 @@ def getPartiesByCongress():
     houseDemNums = list(df['House Dems'])
     senateRepNums = list(df['Senate Reps'])
     houseRepNums = list(df['House Reps'])
+    presParties = list(df['President Party'])
     for i in range(len(congressNums)):
         num = congressNums[i]
         hPctDem = float(houseDemNums[i]) / 435
         hPctRep = float(houseRepNums[i]) / 435
         sPctDem = float(senateDemNums[i]) / 100
         sPctRep = float(senateRepNums[i]) / 100
-        congress = Congress(num, hPctDem, hPctRep, sPctDem, sPctRep)
+        presPartyCode = presParties[i]
+        presParty = 0
+        if (presPartyCode == 'D'):
+            presParty = 1
+        congress = Congress(num, hPctDem, hPctRep, sPctDem, sPctRep, presParty)
         d[num] = congress
     return d
         
